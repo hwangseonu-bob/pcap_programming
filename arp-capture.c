@@ -73,11 +73,11 @@ int main(int argc, char *argv[]) {
 void processPacket(const PacketHeader *header, const u_char *packet) {
     static int cnt = 1;
     printf("Packet Number: %d\n", cnt++);
-//    EtherInfo *info = (EtherInfo*)packet;
-//    printEtherInfo(info);
+    EtherInfo *info = (EtherInfo*)packet;
+    printEtherInfo(info);
     ArpHeader *arpHeader = (ArpHeader*)(packet + 14);
     printArpHeaderInfo(arpHeader);
-//    dumpcode(packet, header->len);
+    dumpcode(packet, header->len);
 }
 
 void printEtherInfo(EtherInfo *info) {
