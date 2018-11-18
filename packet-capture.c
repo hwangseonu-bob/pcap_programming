@@ -58,6 +58,7 @@ int main(int argc, char *argv[]) {
 
 void processPacket(const struct pcap_pkthdr *pkthdr, const u_char *packet) {
     static int cnt = 1;
+    system("clear");
     printf("Packet Number: %d\n", cnt++);
     EtherInfo *info = (EtherInfo*)packet;
     printEtherInfo(info);

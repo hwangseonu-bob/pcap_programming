@@ -64,19 +64,41 @@ int get_ip_by_inf(struct in_addr* ip, const char *dev){
     return 1;
 }
 
-u_short checksum(u_short *buffer, int size) {
-    u_long cksum = 0;
+u_short ipchecksum(ip_header_t *iph) {
+    u_short *iphs = (u_short*)iph;
+    u_short len = 20;
 
-    while (size > 1) {
-        cksum += *buffer++;
-        size -= sizeof(u_short);
+    unsigned chksum;
+
+    u_short fianlchk;
+
+    len >>= 1;
+
+    for (int i = 0; i < len; i++) {
+        chksum += *iphs++;
     }
-    if (size) {
-        cksum += *(u_char*) buffer;
+
+    chksum = (chksum >> 16) + (chksum & 0xffff);
+    chksum += (chksum >> 16);
+    fianlchk = ~chksum & 0xffff;
+    return fianlchk;
+}
+
+u_short icmp_checksum(const u_short *const data, const size_t byte_sz) {
+    if (byte_sz &1) {
+        exit(EXIT_FAILURE);
     }
-    cksum = (cksum >> 16) + (cksum & 0xffff);
-    cksum += (cksum >> 16);
-    return (u_short)(~cksum);
+
+    u_short accu = 0;
+    for (size_t i = 0; i < (byte_sz >> 1); i++) {
+        accu = accu + data[i];
+    }
+
+    while (accu >> 16) {
+        accu = (accu & 0xffff) + (accu >> 16);
+    }
+    const u_short checksum = ~accu;
+    return accu;
 }
 
 int make_packet(u_char **packet, ipaddr_t my_ip, const u_char *my_mac, ipaddr_t target_ip, const u_char *target_mac) {
@@ -98,22 +120,24 @@ int make_packet(u_char **packet, ipaddr_t my_ip, const u_char *my_mac, ipaddr_t 
     iph.version = 4;
     iph.ihl = 5;
     iph.tos = 0;
-    iph.tot_len = (sizeof(eth) + sizeof(iph)) / 100;
-    iph.id = (u_short) getpid();
-    iph.frag_off = 0x4000;
+    iph.tot_len = htons(42);
+    iph.id = getpid();
+    iph.frag_off = htons(0x4000);
     iph.ttl = 64;
     iph.protocol = IPPROTO_ICMP;
     iph.check = 0;
     iph.saddr = my_ip.s_addr;
     iph.daddr = target_ip.s_addr;
+    iph.check = ipchecksum(&iph);
 
     memcpy((*packet)+length, &iph, sizeof(iph));
     length += sizeof(iph);
 
     icmph.type = ICMP_ECHO;
     icmph.code = 0;
-    icmph.un.echo.id = (u_short) getpid();
-    icmph.un.echo.sequence = 1;
+    icmph.un.echo.id = getpid();
+    icmph.un.echo.sequence = htons(1);
+    icmph.checksum = icmp_checksum((u_short*) &icmph, length);
 
     memcpy((*packet)+length, &icmph, sizeof(icmph));
     length += sizeof(icmph);
@@ -162,7 +186,7 @@ int main(int argc, char *argv[]) {
 
     get_ip_by_inf(&my_ip, device);
     get_mac_by_inf(my_mac, device);
-    make_mac_by_str(target_mac, "5c5f67bf46d6");
+    make_mac_by_str(target_mac, argv[1]);
     inet_pton(AF_INET, argv[1], &target_ip);
 
     length = make_packet(&packet, my_ip, my_mac, target_ip, target_mac);
