@@ -1,122 +1,124 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
+#include <stdint.h>
 #include <pcap.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
 
-#define MAXBYTES2CAPTURE 2048
+struct Ethernet {
+    uint8_t destination[6];
+    uint8_t source[6];
+    uint16_t type;
+};
 
-typedef struct {
-    u_char DA[6];
-    u_char SA[6];
-    u_short type;
-} EtherInfo;
+struct IPHeader {
+    uint8_t vhl;
+    uint8_t type_of_service;
+    uint16_t total_length;
+    uint16_t identifier;
+    uint16_t flags_fragment_offset;
+    uint8_t ttl;
+    uint8_t protocol;
+    uint16_t checksum;
+    struct in_addr source;
+    struct in_addr destination;
+};
 
-typedef struct {
-    u_char VIHL;
-    u_char tos;
-    u_short totalLength;
-    u_short identifier;
-    u_short FFO;
-    u_char ttl;
-    u_char protocol;
-    u_short checksum;
-    struct in_addr sourceIp;
-    struct in_addr destinationIp;
-} IpHeader;
+void handle_packet(const struct pcap_pkthdr *pkthdr, const uint8_t *packet);
+void hexdump(const uint8_t *buf, int len);
+void print_mac(const uint8_t mac[]);
+void print_ethernet(struct Ethernet eth);
+void print_ip_header(struct IPHeader ip);
 
-void processPacket(const struct pcap_pkthdr*, const u_char*);
-void printEtherInfo(EtherInfo*);
-void printHeaderInfo(IpHeader*);
-void dumpcode(const u_char*, int);
 
 int main(int argc, char *argv[]) {
-    int stat = 0;
+    if (argc <= 1) {
+        printf("usage: %s <network interface>\n", argv[0]);
+        return -1;
+    }
 
+    int res = 0;
+    char err_buf[PCAP_ERRBUF_SIZE] = {0,};
+
+    pcap_t *desc = NULL;
+    const uint8_t *packet = NULL;
     struct pcap_pkthdr *header;
-    const u_char *packet;
 
-    pcap_t *descr = NULL;
-    char errbuf[PCAP_ERRBUF_SIZE], *device = NULL;
-    memset(errbuf, 0, PCAP_ERRBUF_SIZE);
-    if ((device = pcap_lookupdev(errbuf)) == NULL) {
-        printf("%s\n", errbuf);
-        exit(EXIT_FAILURE);
+    // device, snaplen, promiscuous mode, to ms, error buf
+    desc = pcap_open_live(argv[1], 2048, 1, 512, err_buf);
+
+    if (desc == NULL) {
+        fprintf(stderr, "%s\n", err_buf);
+        return -1;
     }
-    printf("Opening device %s\n", device);
-    descr = pcap_open_live(device, MAXBYTES2CAPTURE, 0, 512, errbuf);
-    while((stat = pcap_next_ex(descr, &header, &packet)) >= 0) {
-        if (stat == 0) {
-            continue;
-        }
-        processPacket(header, packet);
+
+    while ((res = pcap_next_ex(desc, &header, &packet)) >= 0) {
+        if (res == 0) continue;
+        handle_packet(header, packet);
     }
-    pcap_close(descr);
+
+    pcap_close(desc);
     return 0;
 }
 
-void processPacket(const struct pcap_pkthdr *pkthdr, const u_char *packet) {
+void handle_packet(const struct pcap_pkthdr *pkthdr, const uint8_t *packet) {
     static int cnt = 1;
-    system("clear");
-    printf("Packet Number: %d\n", cnt++);
-    EtherInfo *info = (EtherInfo*)packet;
-    printEtherInfo(info);
-    if (ntohs(info->type) == 0x0800) {
-        IpHeader *header = (IpHeader*)(packet + 14);
-        printHeaderInfo(header);
+    printf("Packet Num. %d\n", cnt++);
+    struct Ethernet *eth = (struct Ethernet *) packet;
+    print_ethernet(*eth);
+    if (ntohs(eth->type) == 0x0800) {
+        struct IPHeader *ip = (struct IPHeader *) (packet + 14);
+        print_ip_header(*ip);
     }
-    dumpcode(packet, pkthdr->len);
+    hexdump(packet, pkthdr->len);
 }
 
-void printEtherInfo(EtherInfo *info) {
-    int i = 0;
-    fputs("DA: ", stdout);
+void print_mac(const uint8_t mac[]) {
+    int i;
     for (i = 0; i < 6; i++) {
-        printf("%x", info->DA[i]);
+        printf("%x", mac[i]);
         if (i != 5) putchar(':');
     }
-    putchar('\n');
-    fputs("SA: ", stdout);
-    for (i = 0; i < 6; i++) {
-        printf("%x", info->SA[i]);
-        if (i != 5) putchar(':');
-    }
-    putchar('\n');
-    printf("Type: 0x%04x\n", ntohs(info->type));
 }
 
-void printHeaderInfo(IpHeader *header) {
-    char ipStr[20];
-    inet_ntop(AF_INET, &(header->sourceIp), ipStr, sizeof(ipStr));
-    printf("SIP: %s\n", ipStr);
-    inet_ntop(AF_INET, &(header->destinationIp), ipStr, sizeof(ipStr));
-    printf("DIP: %s\n", ipStr);
-    printf("TTL: %d\n", header->ttl);
+void print_ethernet(struct Ethernet eth) {
+    printf("Destination MAC: ");
+    print_mac(eth.destination);
+    printf("\nSource MAC: ");
+    print_mac(eth.source);
+    printf("\nType: 0x%04x\n", ntohs(eth.type));
 }
 
-void dumpcode(const u_char *buf, int len) {
+void print_ip_header(struct IPHeader ip) {
+    char ip_str[20];
+    inet_ntop(AF_INET, &(ip.source), ip_str, sizeof(ip_str));
+    printf("Source IP: %s\n", ip_str);
+    inet_ntop(AF_INET, &(ip.destination), ip_str, sizeof(ip_str));
+    printf("Destination IP: %s\n", ip_str);
+    printf("TTL: %d\n", ip.ttl);
+}
+
+void hexdump(const uint8_t *buf, int len) {
     int i;
 
     printf("%7s", "offset ");
-    for(i=0; i<16;i++){
+    for (i = 0; i < 16; i++) {
         printf("%02x ", i);
 
-        if(!(i % 16 -7))
+        if (!(i % 16 - 7))
             printf("- ");
     }
     printf("\n\r");
 
-    for(i=0; i<len; i++){
-        if(!(i%16))
+    for (i = 0; i < len; i++) {
+        if (!(i % 16))
             printf("0x%04x ", i);
 
         printf("%02x ", buf[i]);
 
-        if(!(i % 16 - 7))
+        if (!(i % 16 - 7))
             printf("- ");
 
-        if(!(i % 16 - 15)){
+        if (!(i % 16 - 15)) {
             putchar(' ');
             printf("\n\r");
         }
