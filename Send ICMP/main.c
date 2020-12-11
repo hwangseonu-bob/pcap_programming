@@ -14,9 +14,6 @@
 #include <pcap.h>
 #include <errno.h>
 
-
-#define MAXBYTES2CAPTURE 2048
-
 typedef struct in_addr ipaddr_t;
 typedef struct ether_header ether_header_t;
 typedef struct icmphdr icmp_header_t;
@@ -181,7 +178,7 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Opening device %s\n", device);
-    desc = pcap_open_live(device, MAXBYTES2CAPTURE, 0, 512, errbuf);
+    desc = pcap_open_live(device, 2048, 0, 512, errbuf);
 
 
     get_ip_by_inf(&my_ip, device);
