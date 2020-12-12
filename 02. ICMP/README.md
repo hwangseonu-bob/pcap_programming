@@ -1,6 +1,7 @@
-# Packet Capture
+# ICMP
 
 pcap 라이브러리를 활용해 Internet Control Message Protocol (ICMP) 패킷을 보내보자
+ICMP 는 인터넷 연결을 제어하기 위한 메시지를 주고 받는 프로토콜이다.
 
 ## Compile and Run
 
