@@ -13,8 +13,6 @@
 #include <pcap.h>
 #include <errno.h>
 
-#define MAXBYTES2CAPTURE 2048
-
 int get_mac_by_inf(u_char mac[6], const char *dev){
     struct ifreq ifr;
     int fd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP);
@@ -123,7 +121,7 @@ int main(int argc, char *argv[]) {
 //    }
 
     printf("Opening device %s\n", device);
-    desc = pcap_open_live(device, MAXBYTES2CAPTURE, 0, 512, err_buf);
+    desc = pcap_open_live(device, 2048, 0, 512, err_buf);
 
 //    if (pcap_compile(desc, &filter, "arp", 1, mask) == -1) {
 //        printf("%s\n", pcap_geterr(desc));

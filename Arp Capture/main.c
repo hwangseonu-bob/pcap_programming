@@ -5,8 +5,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#define MAXBYTES2CAPTURE 2048
-
 typedef struct pcap_pkthdr PacketHeader;
 
 typedef struct {
@@ -47,7 +45,7 @@ int main(int argc, char *argv[]) {
         exit((EXIT_FAILURE));
     }
     printf("Opening device %s\n", device);
-    descr = pcap_open_live(device, MAXBYTES2CAPTURE, 0, 512, errbuf);
+    descr = pcap_open_live(device, 2048, 0, 512, errbuf);
 
     if (pcap_compile(descr, &filter, "arp", 1, mask) == -1) {
         printf("%s\n", pcap_geterr(descr));
