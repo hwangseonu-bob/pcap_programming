@@ -1,17 +1,27 @@
-# Packet Capture
+# ARP Poison
 
-pcap 라이브러리를 활용해 Address Resolution Protocol (ARP) 패킷을 받아 정보를 출력해보자
+arp를 통해 네트워크 장치들은 어떤 장치가 어떤 ip를 가지고 있는지 알 수 있으며 
+이를 통해 만들어진 arp table을 이용해 통신을 하게 된다.
+
+하지만 arp에 거짓된 정보가 들어있다면 어떻게 될까?
+arp table은 arp를 통해 갱신되기 때문에 거짓된 정보가 arp에 들어있다 하더라도 arp table은 갱신된다.
+이러한 arp의 약점을 이용한 공격이 바로 arp spoofing이다.
+
+이번에는 arp spoofing을 본격적으로 다루진 않고 arp 패킷에 거짓된 정보를 넣어 보내는 부분만 구현해보자.
+
+[arp spoofing 을 구현한 레포](https://github.com/hwangseonu/arp_spoof)
+
 
 ## Compile and Run
 
 ```bash
 make
-sudo ./arp_capture
+sudo ./arp_poison <network interface> <victim address>
 ```
 or 
 ```bash
-gcc main.c -o arp_capture -lpcap
-sudo ./arp_capture
+gcc main.c -o arp_poison -lpcap
+sudo ./arp_poison
 ```
 
 ## Arp
@@ -35,25 +45,11 @@ sudo ./arp_capture
 - 0x0003 (rarp request) : 아이피를 알려줄 것을 요청한다. Who has (MAC)?
 - 0x0004 (rarp reply) : 아이피를 패킷에 담아 보낸다. (MAC) is at (IP)
 
-### 한가지 의문
+### 방법
 
-Ethernet header에도 source와 destination이 있는데 굳이 arp에도 sender mac과 target mac이 있어야할까?
-
-#### 이에 대한 답 
-
-Ethernet header에 있는 mac address는 통신을 위한 정보이지 arp table을 갱신하기 위한 정보가 아니다.
-
-즉, ARP 테이블을 갱신 할 때는 ARP 헤더에 있는 정보만으로 갱신하게 된다.
-소포를 예로 들면 Ethernet 헤더는 보내는 사람과 받는 사람이 적힌 종이이고 ARP 테이블을 갱신할때는 소포 안의 내용만 본다는 것.
-
-## BPF
-
-Berkeley Packet Filter 의 약자로 리눅스에서 지원하는 패킷을 필터링 하기 위해 사용되는 필터이다.
-
-BPF에 대한 것은 내용이 너무 방대하기 때문에 추후에 따로 다루도록 함.
-
-이번 프로젝트에는 `arp` 필터를 활용해 arp 패킷만 받도록 했음.
-
-
+arp table을 오염시키는 방법은 간단하다.
+arp header 에 sender ip 필드에 게이트웨이의 아이피를 넣고 sender mac에 자신의 컴퓨터의 맥주소를 적는다.
+target mac과 target ip는 오염시킬 장비의 주소를 넣어 보내기만 하면
+target에서는 받은 arp 패킷을 이용해 arp table을 업데이트 한다.
 
 
